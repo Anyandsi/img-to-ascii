@@ -6,10 +6,13 @@ interface InputProps {
   characters: string, //input string of characters used for ascii-art
   size: number,
   invert: boolean,
-  sourceImage: string
+  sourceImage: File | null
 }
 
 const ImageConverter = (props: InputProps) => {
+
+  const [convertedText, setConvertedText] = useState<string[]>(['']);
+
   //string of characters transformed into array with optional inversion
   let characters: any = props.characters;
   const CHARS = props.invert ? characters.split("").reverse() : characters.split("");
@@ -17,34 +20,39 @@ const ImageConverter = (props: InputProps) => {
   //canvas used for reference
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [convertedText, setConvertedText] = useState(['']);
-
   useEffect(() => {
-    const img = new Image();
-    img.src = props.sourceImage;
-
     const canvas = canvasRef.current;
+    if(!canvas) return;
 
-    if(canvas !== null){
-      const canvasContext2D = canvas.getContext('2d')!;
-      img.onload = () => {
-        img.width = props.size
-        img.height = props.size
+    const canvasContext2D = canvas.getContext('2d')!;
+    if(!canvasContext2D) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      if(e.target){
+        const img = new Image();
+        img.onload = () => {
+          img.width = props.size;
+          img.height = props.size;
+          console.log("Reader loaded")
+    
+          canvas.width = img.width;
+          canvas.height = img.height;
+          canvasContext2D.drawImage(img, 0, 0, img.width, img.height);
+
+          const imageData = canvasContext2D.getImageData(0, 0, img.width, img.height);
+          setConvertedText(convertPixelsToString(imageData, img.width, img.height, CHARS));
+        }
   
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvasContext2D.drawImage(img, 0, 0, img.width, img.height);
-        const imageData = canvasContext2D.getImageData(0, 0, img.width, img.height);
-  
-        setConvertedText(convertPixelsToString(imageData, img.width, img.height, CHARS));
-      };
-    } else {
-      console.log("Canvas is null")
-      //TODO: handle this possible error
+        img.src = e?.target.result as string;
+      }
     }
-  }, []);
 
-  return <>
+    if(props.sourceImage) reader.readAsDataURL(props.sourceImage);
+  }, [props.sourceImage]);
+
+  return props.sourceImage == null ? <p>Upload your image</p> : <>
     <canvas ref={canvasRef} />
     {convertedText.map(row => <p>{row}</p>)}
   </>;
